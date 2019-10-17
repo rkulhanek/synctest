@@ -1,6 +1,9 @@
 #!/bin/bash
 
-OPTS=$(getopt -o '' -lpull,merge,push -- "$@")
+# TODO: git mergetool leaves backup files sitting around. There *is* a git config option to not create them,
+# but I'd rather they just be turned off from the script.
+
+OPTS=$(getopt -o '' -lpull,push -- "$@")
 action=''
 remotes=()
 
@@ -26,48 +29,42 @@ function error_msg {
 	color "$BRIGHT_RED" "ERROR: $1"
 }
 
+function die {
+	error_msg "$1"
+	exit 1
+}
+
 function help {
 	echo "Usage: $0 --pull remote0 remote1 ..." > /dev/stderr
-	echo "Usage: $0 --merge" > /dev/stderr
 	echo "Usage: $0 --push remote0 remote1 ..." > /dev/stderr
 	echo "Run them in that order."
 	exit 1
 }
 
 function pull {
-	# Verify no uncommited local changes
-	git diff-index --quiet HEAD
-	if [ 0 -ne "$?" ]; then
-		error_msg 'There exist uncommitted changes. Commit them before synchronizing remote repos.'
-		exit 1
-	fi
+	# Verify no uncommitted local changes
+	git diff-index --quiet HEAD || die 'There exist uncommitted changes. Commit them before synchronizing remote repositories.'
 
 	# fetch changes
 	for remote in ${remotes[@]}; do
 		AWK_FILTER="/^$remote/ { print(substr(\$0, 2+length(\"$remote\"))) }"
-		git fetch -- "$remote" # needed to make new branches show up in git branch -r
+		git fetch -- "$remote" || die "Failed to fetch $remote" # needed to make new branches show up in git branch -r
 
 		remote_branches=$(git branch -r | grep -v ' -> ' | sed 's/^ *//' | awk "$AWK_FILTER") # skip, e.g. HEAD -> origin/HEAD
 		color $BRIGHT_BLUE "remote: $remote"
 		for branch in $remote_branches; do
 			color $BRIGHT_BLUE "branch: $remote/$branch"
-			git checkout "$branch"
+			git checkout "$branch" || die "Failed to checkout $remote/$branch"
 			git pull -- "$remote" "$branch"
-		done
-	done
-}
-
-function merge {
-	for remote in ${remotes[@]}; do
-		AWK_FILTER="/^$remote/ { print(substr(\$0, 2+length(\"$remote\"))) }"
-		remote_branches=$(git branch -r | grep -v ' -> ' | sed 's/^ *//' | awk "$AWK_FILTER") # skip, e.g. HEAD -> origin/HEAD
-		for branch in $remote_branches; do
-			color $BRIGHT_BLUE "merge branch: $remote/$branch"
-			git mergetool
-			if [ 0 -eq "$?" ]; then
-				git commit -m "merged $remote/$branch"
-			else
-				error_msg "Skipping commit for $remote/$branch"
+			if [ 0 -ne "$?" ]; then
+				# TODO: Find a way to distinguish between the "pull needs to merge" sort of error code and the "actual failure" kind
+				git mergetool
+				if [ 0 -eq "$?" ]; then
+					git commit -m "merged $remote/$branch" || die "Failed to commit merge on $remote/$branch"
+				else
+					error_msg "Failed to merge $remote/$branch. Aborting."
+					exit 1
+				fi
 			fi
 		done
 	done
@@ -75,7 +72,7 @@ function merge {
 
 function push {
 	for remote in ${remotes[@]}; do
-		git push --all "$remote"
+		git push --all "$remote" || die "Failed to push to $remote"
 	done
 }
 
@@ -120,7 +117,13 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-if [ 'merge' != "$action" -a 0 -eq "${#remotes[@]}" ]; then
+if [ -z "$action" ]; then
+	error_msg "No action specified"
+	help
+	exit 1
+fi
+
+if [ 0 -eq "${#remotes[@]}" ]; then
 	error_msg "--$action action requires a list of remote repositories"
 	help
 	exit 1

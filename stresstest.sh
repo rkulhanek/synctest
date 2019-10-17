@@ -10,10 +10,6 @@ fi
 mkdir -p "$TESTDIR"
 cd "$TESTDIR"
 
-if [ -e local -o -e remote0 -o -e remote1 ]; then
-	exit 1
-fi
-
 # Create repos.
 mkdir local
 mkdir remote0

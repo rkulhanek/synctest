@@ -6,6 +6,8 @@ remotes=(remote0 remote1)
 # TODO: Set a working directory other than the current one to do this in. If things
 # get weird, I want it clobbering a directory I don't care about
 
+# TODO: handle it correctly when saying "n" to the "was a merge resolved" message from mergetool
+
 DEFAULT_COLOR=0
 RED=31
 GREEN=32
@@ -47,7 +49,11 @@ for remote in ${remotes[@]}; do
 		git checkout "$branch"
 		git pull -- "$remote" "$branch"
 		git mergetool
-		git commit -m "merged $remote/$branch"
+		if [ 0 -eq "$?" ]; then
+			git commit -m "merged $remote/$branch"
+		else
+			error_msg "Skipping commit for $remote/$branch"
+		fi
 	done
 done
 
