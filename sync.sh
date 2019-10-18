@@ -3,7 +3,7 @@
 # TODO: git mergetool leaves backup files sitting around. There *is* a git config option to not create them,
 # but I'd rather they just be turned off from the script.
 
-OPTS=$(getopt -o '' -lpull,push -- "$@")
+OPTS=$(getopt -o '' -lpull,push,all -- "$@")
 action=''
 remotes=()
 
@@ -37,10 +37,36 @@ function die {
 function help {
 	echo "Usage: $0 --pull remote0 remote1 ..." > /dev/stderr
 	echo "Usage: $0 --push remote0 remote1 ..." > /dev/stderr
-	echo "Run them in that order."
+	echo "Run them in that order." > /dev/stderr
+	echo ""
+	echo "An alternative to specifying remotes manually is to pass the --all option." > /dev/stderr
+	echo "That will get the list of all remotes configured for the repository." > /dev/stderr
+	echo "If multiple remotes point to the same server, it will only use one of them." > /dev/stderr
 	exit 1
 }
 
+# Returns (in $remotes) a list of all remote names that point to distinct URIs
+# If multiple remotes point to the same server, favor the non-"origin" remote
+# name if possible; otherwise, just pick the first one
+function get_uniq_remotes {
+	remotes=()
+	lst=$(git remote -v | awk '{print $2}' | sort -u)
+
+	for i in $lst; do
+		AWK_CMD="\$2==\"$i\" { print \$1 }"
+		remotenames=$(git remote -v | awk -- "$AWK_CMD" | sort -u)
+		
+		nl=$(echo "$remotenames" | wc -l)
+		if [ "$nl" -gt 1 ]; then
+			remote=$(echo "$remotenames" | grep -v 'origin' | head -1)
+		else
+			remote=$(echo "$remotenames" | head -1)
+		fi
+		remotes+=("$remote")
+	done
+}
+
+# Fetch and merge from all specified remotes
 function pull {
 	# Verify no uncommitted local changes
 	git diff-index --quiet HEAD || die 'There exist uncommitted changes. Commit them before synchronizing remote repositories.'
@@ -54,7 +80,7 @@ function pull {
 		color $BRIGHT_BLUE "remote: $remote"
 		for branch in $remote_branches; do
 			color $BRIGHT_BLUE "branch: $remote/$branch"
-			git checkout "$branch" || die "Failed to checkout $remote/$branch"
+			git checkout -- "$branch" || die "Failed to checkout $remote/$branch"
 			git pull -- "$remote" "$branch"
 			if [ 0 -ne "$?" ]; then
 				# TODO: Find a way to distinguish between the "pull needs to merge" sort of error code and the "actual failure" kind
@@ -70,9 +96,10 @@ function pull {
 	done
 }
 
+# Push changes to all specified remotes
 function push {
 	for remote in ${remotes[@]}; do
-		git push --all "$remote" || die "Failed to push to $remote"
+		git push --all -- "$remote" || die "Failed to push to $remote"
 	done
 }
 
@@ -80,13 +107,22 @@ function push {
 
 function setaction {
 	if [ ! -z "$action" ]; then
-		error_msg "multiple actions specified. Set exactly one of --pull --merge --push"
+		error_msg "Multiple actions specified. Set exactly one of --pull --merge --push"
 		exit 1
 	fi
 	action="$1"
 }
 
+function add_repo {
+	if [ "$use_all_repos" -eq 1 ]; then
+		error_msg "Either pass a list of remotes *or* pass the --all flag. Not both."
+		exit 1
+	fi
+	remotes+=("$1")
+}
+
 ## main ##
+use_all_repos=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--pull) 
@@ -101,19 +137,24 @@ while [ $# -gt 0 ]; do
 			setaction "push"
 			shift 
 			;;
+		--all)
+			use_all_repos=1
+			get_uniq_remotes
+			shift
+			;;
 		--)
 			shift
 			break
 			;;
-		*) 
-			remotes+=("$1")
+		*)
+			add_remote "$1"
 			shift
 			;;
 	esac
 done
 
 while [ $# -gt 0 ]; do
-	remotes+=("$1")
+	add_remote "$1"
 	shift
 done
 
