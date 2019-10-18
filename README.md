@@ -1,11 +1,13 @@
-Script for synchronizing gitlab and di2e repos
+Script for synchronizing git repository with multiple remotes
 
 # Configuration
 
 ## Add links to all the remote repositories.
 The form of the URI should be specified by whatever git service you're using.
 For example:
+
 `remote add gitlab git@gitlab.com:example/test.git`
+
 `remote add github https://github.com/example/test.git`
 
 The labels (gitlab and github in those examples) are what git-sync will refer to.
@@ -17,10 +19,10 @@ specify one, it will prompt for one each time.
 `git mergetool --tool-help` will list a set of available mergetools. vimdiff and emerge are the ones
 that use vim and emacs, respectively. Generally, mergetools will open multiple buffers:
 
-	* The more recent common version of the file
-	* The local version
-	* The remote version
-	* The version that you will modify and merge into the repository.
+* The more recent common version of the file
+* The local version
+* The remote version
+* The version that you will modify and merge into the repository.
 
 Exact details will vary depending on the mergetool.
 
