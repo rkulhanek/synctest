@@ -3,7 +3,7 @@
 # TODO: git mergetool leaves backup files sitting around. There *is* a git config option to not create them,
 # but I'd rather they just be turned off from the script.
 
-OPTS=$(getopt -o '' -lpull,push,all -- "$@")
+OPTS=$(getopt -o 'h' -lpull,push,all,help -- "$@")
 action=''
 remotes=()
 
@@ -125,6 +125,10 @@ function add_repo {
 use_all_repos=0
 while [ $# -gt 0 ]; do
 	case "$1" in
+		-h | --help)
+			help
+			exit 0
+			;;
 		--pull) 
 			setaction "pull"
 			shift 
