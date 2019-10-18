@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Creates two remote repos, three clients and a lot of merge conflicts waiting to happen.
+# Run this script, then run git-sync.sh from the $TESTDIR/local directory
+
 TESTDIR="$HOME/code/QA/synctest/stresstest"
 
 if [ -e "$TESTDIR" ]; then
@@ -82,7 +85,4 @@ echo 'local Bbar' > Bbar
 git add Bfoo Bbar
 git commit -m 'local added Bfoo (incompatible with remote0 version), Bbar'
 # explicitly staying out of master branch. make sure it doesn't try to check out master into B
-
-# TODO: run synctest here
-# TODO: checkout a new copy of each of remote0, remote1, and verify that each is identical to local
 

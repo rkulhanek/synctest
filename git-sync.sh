@@ -80,7 +80,7 @@ function pull {
 		color $BRIGHT_BLUE "remote: $remote"
 		for branch in $remote_branches; do
 			color $BRIGHT_BLUE "branch: $remote/$branch"
-			git checkout -- "$branch" || die "Failed to checkout $remote/$branch"
+			git checkout "$branch" || die "Failed to checkout $remote/$branch"
 			git pull -- "$remote" "$branch"
 			if [ 0 -ne "$?" ]; then
 				# TODO: Find a way to distinguish between the "pull needs to merge" sort of error code and the "actual failure" kind
@@ -113,7 +113,7 @@ function setaction {
 	action="$1"
 }
 
-function add_repo {
+function add_remote {
 	if [ "$use_all_repos" -eq 1 ]; then
 		error_msg "Either pass a list of remotes *or* pass the --all flag. Not both."
 		exit 1
